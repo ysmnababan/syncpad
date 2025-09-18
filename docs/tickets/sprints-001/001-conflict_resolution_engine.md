@@ -12,7 +12,7 @@ Learn about core technology of the `syncpad` project -> CONFLICT RESOLUTION ALGO
 ---
 
 ## ✅ Acceptance Criteria
-- [ ] Understand basic knowledge of distributed systems
+- [X] Understand basic knowledge of distributed systems
 - [ ] Understand basic knowlegde of conflict resolution engine
 - [ ] Understand basic knowledge of CRDT
 - [ ] Understand basic knowledge of OT
