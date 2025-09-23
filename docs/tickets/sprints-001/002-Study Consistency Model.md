@@ -3,8 +3,8 @@
 **ID:** TKT-101
 **Status:** Todo
 **Priority:** High
-**Planned Score:** 2
-**Actual Score:** 
+**Planned Score:** 3
+**Actual Score:** 3
 **Created:** 2025-09-22
 
 ## 🎯 Goal
