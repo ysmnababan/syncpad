@@ -107,6 +107,7 @@ Process B:           ---- b1(receive 5) -----
     B: [3 1 0]                                         → [5 2 2]
     C: [2 0 1] → [2 0 2]
     ```
+- You can also see the demo for Vector Clock [here](./vcdemo/main.go)
 
 
 ## Key takeways
