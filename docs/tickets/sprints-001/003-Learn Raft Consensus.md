@@ -1,7 +1,7 @@
 # Ticket: Learn Raft Consensus
 
 **ID:** TKT-003
-**Status:** Todo
+**Status:** Done
 **Priority:** High
 **Planned Score:** 3
 **Actual Score:** 3

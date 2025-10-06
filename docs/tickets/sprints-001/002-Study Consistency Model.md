@@ -1,7 +1,7 @@
 # Ticket: Study Consistency Models
 
 **ID:** TKT-002
-**Status:** Todo
+**Status:** Done
 **Priority:** High
 **Planned Score:** 3
 **Actual Score:** 3

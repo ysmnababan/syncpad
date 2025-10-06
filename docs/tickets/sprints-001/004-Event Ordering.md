@@ -1,7 +1,7 @@
 ## Ticket: Study Event Ordering & Causality
 
 **ID:** TKT-004
-**Status:** Todo
+**Status:** Done
 **Priority:** Medium
 **Planned Score:** 5
 **Actual Score:** 5
