@@ -1,54 +1,107 @@
-# One-sentence summary
+# Latest document model (concise)
 
-You’re using a centralized sequencer model: clients connect over WebSocket, send local ops (with client-side counters/ids), the server assigns a global monotonically increasing sequence number (server-seq) for each accepted op, persists ops, issues snapshots + compaction periodically, and clients optimistic-apply then reconcile on ack.
+**Topology & transport**
 
-# What your model gets right (strengths)
+* Clients connect to a cluster of servers over WebSocket.
+* Servers run a replicated sequencer (leader elected via Raft). Leader assigns canonical `serverSeq` to persisted ops.
 
-* **Deterministic global order:** server Seq gives a single canonical ordering so replicas can converge if ops are applied deterministically.
-* **Durability path available:** persisting ops before ack + snapshots/compaction is compatible with Level-2 durability.
-* **Good UX option:** optimistic local apply + ack reconciliation supports responsive editing.
-* **Low initial operational complexity:** single sequencer is simple to implement and great for a learning/demo/resume project.
+**Client lifecycle**
 
-# Remaining correctness issues (why it can still diverge / be surprising)
+* On connect: client fetches latest snapshot metadata (`lastIncludedSeq`) + recent ops (`> lastIncludedSeq`) and sets `currentServerSeq`.
+* Client does **optimistic apply** locally when the user edits and enqueues the operation in an *in-flight queue*.
 
-* **Numeric positions remain fragile.** Clients send `pos` computed against local state; server ordering can shift positions. Without transform/rebase semantics or a position model that survives reordering, inserts/deletes land wrong.
-* **Ambiguity about what a server sequence orders.** You must be explicit: serverSeq orders *committed application order*. Any other interpretation invites mismatches.
-* **Tie-breaking / intention preservation missing.** Total order resolves deterministically but may not match user intent (two concurrent inserts at same logical spot still need deterministic tie-break or metadata to preserve intent).
-* **Client optimistic vs server reality mismatch.** If clients apply optimistically, they need a clear, implementable way to adjust when serverAck implies transforms — otherwise UI jumps or lost-ops happen.
+**Operation message**
 
-# Fault-tolerance & operational pitfalls
+* Client → Server per op:
 
-* **Single sequencer = single point of failure / throughput bottleneck.** Acceptable for Level-2 but you’ll need persistence + restart/recovery to mitigate downtime/data loss.
-* **Crash / persistence race:** issuing sequence numbers without durable persistence before acknowledging can lead to gaps, duplicates, or reissued seqs after crashes.
-* **Pre-allocation / batch-seq semantics are dangerous if unclear.** Handing ranges of seqs to clients or pre-allocating without robust recovery semantics creates unused holes or conflicting assumptions.
-* **Sharding/scale complexity:** global seqs don’t scale across shards; moving to per-doc or per-shard sequences changes ordering semantics and requires careful design if cross-doc consistency is needed.
+  * `opId` (clientId + clientLocalSeq),
+  * `clientId`,
+  * `clientBaseSeq` (serverSeq the client last knew),
+  * `op` (insert/delete payload, incl. positions or payload format).
+* Server persists op atomically (WAL/DB) and assigns `serverSeq` (arrival order at leader), then broadcasts ack/broadcast including `serverSeq` and either `appliedOp` or `interveningOps`.
 
-# Storage / lifecycle issues
+**Dedup & retries**
 
-* **Op log growth:** without snapshots + truncation you’ll hit storage and replay costs.
-* **Snapshot/compaction correctness:** you must record `lastIncludedSeq` and ensure late-joining clients only need snapshot + ops after that seq. Otherwise replays can resurrect or reapply stale operations.
-* **Idempotency & dedupe:** need stable `opId` (clientId + localSeq) to dedupe retries and prevent duplicate application.
+* Server uses `opId` to detect duplicates; if a duplicate is received it returns the earlier `serverSeq`/ack (idempotency).
 
-# Security / practical concerns
+**Snapshots & compaction**
 
-* **Authenticate & authorize ops:** ensure ops carry user identity and are validated before persisting/ordering.
-* **Prevent malicious replays:** combine opIds + serverSeq + auth checks to avoid attackers reintroducing or faking ops.
+* Server periodically creates snapshots (materialized doc + `lastIncludedSeq`) and truncates/compacts op log up to `lastIncludedSeq`.
+* If a client sends an op with `clientBaseSeq < lastIncludedSeq`, server returns a `STALE_BASE` response instructing client to re-sync snapshot + ops.
 
-# Short, non-prescriptive hints (do these next; no full algorithms)
+**Replication & availability**
 
-* Use stable `opId = clientId + clientSeq` for idempotence and dedupe.
-* Make serverSeq assignment atomic and durable before acknowledging clients.
-* Record explicit metadata with each op: `opId, clientId, clientBaseVersion, serverSeq, timestamp`.
-* Implement snapshots with `lastIncludedSeq` and truncate ops ≤ that seq only after snapshot persistence.
-* Keep presence/cursor messages out of the durable op path (ephemeral transport).
-* Implement optimistic apply with an in-flight queue; when serverAck arrives, rebase/transform the in-flight ops against intervening serverSeq ops.
+* Sequencer is replicated (Raft style); leader assigns `serverSeq`. Followers replicate persisted ops. Leader election handles failover (details TBD).
 
-# Concrete short checklist you can copy into your notes (next three hands-on steps)
+**Misc**
 
-1. Add `opId` and persist op atomically on server before ack.
-2. Add snapshot + metadata `lastIncludedSeq` and truncate up to that seq.
-3. Implement client in-flight queue: optimistic apply → store local op with `opId` → send → on ack match by `opId` and reconcile.
+* Presence/cursor updates are kept ephemeral (separate from durable op pipeline).
+* Clients reconcile optimistic in-flight ops when server acks arrive (rebase/transform logic run client or handled by server).
 
-# Final take / how to use this
+---
 
-This model is a solid Level-2 starting point: it teaches you sequence assignment, persistence, snapshots, optimistic UI, and common failure modes (all resume-worthy). But keep in mind the two big knobs you’ll face later: (A) how to represent positions so they survive reordering (transform/rebase or CRDT positional ids), and (B) how far you’ll take fault tolerance (single durable sequencer vs distributed consensus). Tackle (A) next when you’re ready to address correctness under concurrency.
+# Concise list of unanswered/unspecified concerns (things to address later)
+
+**Correctness & semantics**
+
+* **Position model undefined:** raw numeric `pos` is still fragile under concurrent edits — who transforms indices and what are the exact transform rules? (OT vs CRDT choice not resolved.)
+* **Definition of `serverSeq` semantics:** it’s arrival order at leader, but is that *ordering of persisted ops after transform* or *ordering of original arrivals*? Need exact canonical semantics to avoid ambiguity.
+
+**Transform & reconciliation**
+
+* **Who performs transforms?** Server-side transforms reduce client work but centralize complexity; client-side rebase requires clients to run transform logic. Not specified.
+* **In-flight multi-op causality:** how multiple local in-flight ops are causally related and how to rebase them in order.
+
+**Replication & leader semantics**
+
+* **Atomicity & durability at leader:** must persist before ack; not specified how to ensure no gaps on leader crash.
+* **Leader failover effects:** what happens to seq continuity and uncommitted ops during leader change? (raft commit/replication quorum behavior needs exact handling.)
+* **Pre-allocation / holes:** if you ever pre-allocate seq ranges to speed throughput, how do you handle unused holes on failover?
+
+**Snapshots / compaction under replication**
+
+* **Coordination of snapshots across replicas:** when leader compacts/truncates, followers must agree on `lastIncludedSeq`; need protocol for snapshot installation and consistent truncation.
+* **Client resync semantics:** exact flow for `STALE_BASE` (should client re-send ops or re-create them after resync?) not specified.
+
+**Storage & recovery**
+
+* **Write-ahead logging & fsync policy:** how do you guarantee persisted ops will survive crash before acknowledging clients? Performance tradeoffs not decided.
+* **Crash-after-assign race:** if a seq is assigned but not durably replicated before ack, crash can cause contradictions — not yet defined.
+
+**Scalability & sharding**
+
+* **Per-doc vs global sequencing:** global seqs don’t scale; plan for per-document/per-shard seqs or ownership model not defined.
+* **Cross-shard edits or multi-doc transactions:** not addressed.
+
+**Compaction GC & tombstones**
+
+* **Deletes & garbage collection:** how are deletions/Ghosts/tombstones represented and compacted (especially for CRDT-like approaches)? Not defined.
+* **Late-joining replicas & tombstone retention:** retention policy and GC invariants missing.
+
+**Undo / history / provenance**
+
+* **Undo semantics in multi-user context** (intention-preserving undo) not specified; transforms or special metadata required.
+
+**Performance & UX**
+
+* **InterveningOps size bounds:** how to prevent huge digests for lagging clients (throttle, snapshots, delta compression) not specified.
+* **Backpressure and flow control:** how server protects from high fanout or slow clients is unspecified.
+
+**Security & integrity**
+
+* **Auth / authorization / op signing:** who is allowed to submit ops and how to prevent malicious replays/injection not defined.
+* **Auditability:** how transformed ops preserve provenance for auditing.
+
+**Testing & upgrades**
+
+* **Test harnesses:** specific test cases for leader crash, duplicate opId, stale-base, reorderings not yet enumerated.
+* **Versioning & migration:** op & snapshot versioning strategy for future changes not defined.
+
+---
+
+# Short, prioritized things to decide next (so you can move forward)
+
+1. Choose OT vs CRDT for the position/merge model (this affects almost everything else).
+2. Specify exact serverSeq semantics (arrival vs transformed-application) and persist-before-ack policy.
+3. Define stale-base resync flow concretely (what client does on `STALE_BASE`).
+4. Decide per-document sequencing or global sequencing (scale implications).
