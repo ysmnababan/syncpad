@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -31,9 +32,7 @@ func NewNode(N int, pos int) *Node {
 	}
 }
 func (n *Node) Increment() {
-	inc := n.local[n.pos]
-	inc++
-	n.local[n.pos] = inc
+	n.local[n.pos]++
 	n.ShowTotalCounter()
 }
 
@@ -76,68 +75,69 @@ func NewGlobalCounter(N int) *GlobalCounter {
 	}
 }
 
-func (gc *GlobalCounter) RunNode(pos int) {
-	for range gc.nodes[pos].ch {
-		fmt.Println("Hey, this is from pos ", pos)
-		gc.nodes[pos].Increment()
-		for i := range gc.N {
-			if i == pos {
-				continue
+func (gc *GlobalCounter) RunNode(pos int, done chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for {
+		select {
+		case <-gc.nodes[pos].ch:
+			fmt.Println("Hey, this is from pos ", pos)
+			gc.nodes[pos].Increment()
+			for i := range gc.N {
+				if i == pos {
+					continue
+				}
+				gc.nodes[pos].Synchronize(gc.nodes[i])
 			}
-			gc.nodes[pos].Synchronize(gc.nodes[i])
+		case <-done:
+			close(gc.nodes[pos].ch)
+			fmt.Println("done from ", pos)
+			return
 		}
 	}
 }
 
 func main() {
-	fmt.Printf("G COUNTER CRDT DEMO\n")
+	fmt.Printf("G-COUNTER CRDT DEMO\n")
 	fmt.Println("----------------------")
 	fmt.Println("")
 	N := 5
+	var wg sync.WaitGroup
+	wg.Add(N)
 	gc := NewGlobalCounter(N)
-	done := make(chan struct{}, 1)
-	pos := make(chan int)
+	done := make(chan struct{})
 	for i := range N {
-		go gc.RunNode(i)
+		go gc.RunNode(i, done, &wg)
 	}
-	go func() {
-		totalCounter := 0
-		for {
-			reader := bufio.NewReader(os.Stdin)
-			in, err := reader.ReadString('\n')
-			if err != nil {
-				fmt.Println("can't read:", err)
-			}
-			fmt.Println()
-			fmt.Println("-------")
-			in = strings.Trim(in, "\n")
-			if in == "c" {
-				close(done)
-				return
-			}
-			posInt, err := strconv.Atoi(in)
-			if err != nil {
-				fmt.Println("invalid input")
-				continue
-			}
-			if posInt >= N {
-				fmt.Println("out of range")
-				continue
-			}
-			totalCounter++
-			fmt.Println("TOTAL COUNTER: ", totalCounter)
-			gc.nodes[posInt].ch <- struct{}{}
-		}
-	}()
+
+	totalCounter := 0
 
 	for {
-		select {
-		case <-done:
-			fmt.Println("end")
-			return
-		case p := <-pos:
-			fmt.Println(p)
+		reader := bufio.NewReader(os.Stdin)
+		in, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("can't read:", err)
 		}
-
+		fmt.Println()
+		fmt.Println("-------")
+		in = strings.Trim(in, "\n")
+		if in == "c" {
+			break
+		}
+		posInt, err := strconv.Atoi(in)
+		if err != nil {
+			fmt.Println("invalid input")
+			continue
+		}
+		if posInt >= N {
+			fmt.Println("out of range")
+			continue
+		}
+		totalCounter++
+		fmt.Println("TOTAL COUNTER: ", totalCounter)
+		gc.nodes[posInt].ch <- struct{}{}
 	}
+	close(done)
+
+	wg.Wait()
+	fmt.Println("done")
 }
