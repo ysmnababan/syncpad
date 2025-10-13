@@ -1,10 +1,10 @@
 # Ticket: Implement Foundational CRDTs in Go (Level 1)
 
-**ID:** TKT-CRDT-01
+**ID:** TKT-103
 **Status:** Todo
 **Priority:** High
 **Planned Score:** 3
-**Actual Score:** <fill in after completion>
+**Actual Score:** 6
 **Created:** 2025-10-10
 
 ---
@@ -23,11 +23,11 @@ By the end of this ticket, you should *feel confident* explaining:
 
 ## ✅ Acceptance Criteria
 
-* [ ] Implement at least **two Level-1 CRDTs** in Go: G-Counter, PN-Counter, or OR-Set
-* [ ] Simulate **at least 2–3 replicas** (using goroutines or functions) exchanging state and merging periodically
-* [ ] Observe and record behavior when updates arrive in different orders
-* [ ] Write a short summary explaining what “eventual convergence” *feels like* in practice
-* [ ] Capture 2–3 takeaways relevant to backend design (e.g., merge semantics, idempotency, metadata growth)
+* [X] Implement at least **two Level-1 CRDTs** in Go: G-Counter, PN-Counter, or OR-Set
+* [X] Simulate **at least 2–3 replicas** (using goroutines or functions) exchanging state and merging periodically
+* [X] Observe and record behavior when updates arrive in different orders
+* [X] Write a short summary explaining what “eventual convergence” *feels like* in practice
+* [X] Capture 2–3 takeaways relevant to backend design (e.g., merge semantics, idempotency, metadata growth)
 
 ---
 
