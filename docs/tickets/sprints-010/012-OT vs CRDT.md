@@ -1,6 +1,6 @@
 # Ticket: Compare OT vs CRDT and Create ADR for Synchronization Strategy
 
-**ID:** TKT-102
+**ID:** TKT-012
 **Status:** Done
 **Priority:** High
 **Planned Score:** 3

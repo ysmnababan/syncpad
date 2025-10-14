@@ -1,7 +1,7 @@
 # Ticket: Implement Foundational CRDTs in Go (Level 1)
 
-**ID:** TKT-103
-**Status:** Todo
+**ID:** TKT-013
+**Status:** Done
 **Priority:** High
 **Planned Score:** 3
 **Actual Score:** 6
