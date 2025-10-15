@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOneReplica(t *testing.T) {
@@ -77,4 +78,30 @@ INSERT From: A To: B: Message: o
 -----------
 `
 	assert.Equal(t, expectedMessage, buff.String())
+}
+
+func TestPush(t *testing.T) {
+	queue := NewQueue(10)
+	env := Envelope{To: "X"}
+	assert.Equal(t, 0, queue.readCounter)
+	assert.Equal(t, 0, queue.insertCounter)
+	assert.Equal(t, 10, len(queue.data))
+
+	err := queue.Push(env)
+	require.NoError(t, err)
+	assert.Equal(t, 10, len(queue.data))
+	assert.Equal(t, "X", queue.data[0].To)
+	for range 9 {
+		err := queue.Push(env)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 10, queue.insertCounter)
+
+	err = queue.Push(env)
+	assert.Equal(t, "buffer already full", err.Error())
+	queue.readCounter = 5
+	env.To = "Y"
+	err = queue.Push(env)
+	require.NoError(t, err)
+	assert.Equal(t, "Y", queue.data[0].To)
 }

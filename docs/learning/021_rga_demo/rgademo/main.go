@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 )
@@ -178,6 +177,33 @@ func (r *Replica) PrintTextOnly(w io.Writer) {
 	r.RgaState.Head.PrintText(w)
 }
 
+type Queue struct {
+	size          int
+	data          []Envelope
+	readCounter   int
+	insertCounter int
+}
+
+func NewQueue(N int) *Queue {
+	return &Queue{
+		data:          make([]Envelope, N),
+		readCounter:   0,
+		insertCounter: 0,
+		size:          N,
+	}
+}
+
+func (q *Queue) Push(env Envelope) error {
+	if q.insertCounter-q.readCounter == q.size {
+		return fmt.Errorf("buffer already full")
+	}
+
+	idx := q.insertCounter % q.size
+	q.data[idx] = env
+	q.insertCounter++
+	return nil
+}
+
 type Network struct {
 	Replicas []*Replica
 	Queue    []Envelope
@@ -212,27 +238,11 @@ func (n *Network) ShowQueue(w io.Writer) {
 	fmt.Fprintln(w, "-----------")
 }
 
+func (n *Network) Broadcast() {
+	// for _, env := range n.Queue {
+	// env.
+	// }
+}
+
 func main() {
-	net := &Network{
-		Replicas: make([]*Replica, 0, 3),
-		Queue:    make([]Envelope, 0, 1024),
-	}
-	r1 := NewReplica("A")
-	net.AddNewReplica(r1)
-
-	r1.Add("h", NewIDwithA(0), net)
-	r1.Add("e", NewIDwithA(1), net)
-	r1.Add("l", NewIDwithA(2), net)
-	r1.Add("l", NewIDwithA(3), net)
-	r1.Add("o", NewIDwithA(4), net)
-	r1.Add("X", NewIDwithA(0), net)
-	w := os.Stdout
-	r1.PrintTextOnly(w)
-
-	r1.Remove(NewIDwithA(6), net)
-	r1.PrintTextOnly(w)
-	r1.Remove(NewIDwithA(2), net)
-	r1.PrintTextOnly(w)
-
-	net.ShowQueue(w)
 }
