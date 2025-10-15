@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 )
 
 type ID struct {
@@ -199,12 +200,16 @@ func (n *Network) AddNewReplica(r *Replica) {
 	n.Replicas = append(n.Replicas, r)
 }
 
-func (n *Network) ShowQueue() {
-	fmt.Println("Queue with lenght: ", len(n.Queue))
+func (n *Network) ShowQueue(w io.Writer) {
+	fmt.Fprintln(w, "Queue with length: ", len(n.Queue))
 	for _, env := range n.Queue {
-		fmt.Printf("From:%s To: %s: Message: %s\n", env.Msg.Op.From, env.To, env.Msg.Op.Value)
+		fmt.Fprintf(w, "%s From: %s To: %s: Message: %s\n",
+			strings.ToUpper(env.Msg.Op.Type),
+			env.Msg.Op.From,
+			env.To,
+			env.Msg.Op.Value)
 	}
-	fmt.Println("-----------")
+	fmt.Fprintln(w, "-----------")
 }
 
 func main() {
@@ -229,5 +234,5 @@ func main() {
 	r1.Remove(NewIDwithA(2), net)
 	r1.PrintTextOnly(w)
 
-	net.ShowQueue()
+	net.ShowQueue(w)
 }
