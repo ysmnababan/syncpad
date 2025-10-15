@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"sort"
 )
 
@@ -51,17 +53,17 @@ func (p *Node) InsertChild(c *Node) {
 		return p.Children[i].ID.ReplicaID < p.Children[j].ID.ReplicaID // then by replicaID
 	})
 }
-func (n *Node) PrintText() {
+
+func (n *Node) PrintText(w io.Writer) {
 	if !n.Tombstone {
-		fmt.Printf("%s", n.Value)
+		fmt.Fprintf(w, "%s", n.Value)
 	}
 	for _, ch := range n.Children {
-		ch.PrintText()
+		ch.PrintText(w)
 	}
 
 	if n.IsHead() {
-		fmt.Println()
-		fmt.Println("-end of sequential text-")
+		fmt.Fprintln(w)
 	}
 }
 
@@ -171,8 +173,8 @@ func (r *Replica) Remove(id ID, n *Network) {
 	n.AddToQueue(Op)
 }
 
-func (r *Replica) PrintTextOnly() {
-	r.RgaState.Head.PrintText()
+func (r *Replica) PrintTextOnly(w io.Writer) {
+	r.RgaState.Head.PrintText(w)
 }
 
 type Network struct {
@@ -219,12 +221,13 @@ func main() {
 	r1.Add("l", NewIDwithA(3), net)
 	r1.Add("o", NewIDwithA(4), net)
 	r1.Add("X", NewIDwithA(0), net)
-	r1.PrintTextOnly()
+	w := os.Stdout
+	r1.PrintTextOnly(w)
 
 	r1.Remove(NewIDwithA(6), net)
-	r1.PrintTextOnly()
+	r1.PrintTextOnly(w)
 	r1.Remove(NewIDwithA(2), net)
-	r1.PrintTextOnly()
+	r1.PrintTextOnly(w)
 
 	net.ShowQueue()
 }
