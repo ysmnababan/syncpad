@@ -9,10 +9,7 @@ import (
 )
 
 func TestOneReplica(t *testing.T) {
-	net := &Network{
-		Replicas: make([]*Replica, 0, 1),
-		Queue:    NewQueue(1024),
-	}
+	net := NewNetwork(1, 1024)
 	r1 := NewReplica("A")
 	net.AddNewReplica(r1)
 
@@ -43,10 +40,8 @@ func TestOneReplica(t *testing.T) {
 }
 
 func TestSendToNetworkQueue(t *testing.T) {
-	net := &Network{
-		Replicas: make([]*Replica, 0, 1),
-		Queue:    NewQueue(1024),
-	}
+	net := NewNetwork(1, 1024)
+
 	r1 := NewReplica("A")
 	net.AddNewReplica(r1)
 	r2 := NewReplica("B")
@@ -128,4 +123,43 @@ func TestPop(t *testing.T) {
 	}
 	_, err = queue.Pop()
 	assert.Equal(t, "buffer is empty", err.Error())
+}
+
+func TestBroadcast(t *testing.T) {
+	net := NewNetwork(1, 1024)
+
+	r1 := NewReplica("A")
+	net.AddNewReplica(r1)
+	r2 := NewReplica("B")
+	net.AddNewReplica(r2)
+	assert.Equal(t, 2, len(net.Replicas))
+
+	assertText := func(expected string) {
+		buff := &bytes.Buffer{}
+		r1.PrintTextOnly(buff)
+		assert.Equal(t, expected, buff.String())
+	}
+
+	r1.Add("h", NewIDwithA(0), net)
+	r1.Add("e", NewIDwithA(1), net)
+	r1.Add("l", NewIDwithA(2), net)
+	r1.Add("l", NewIDwithA(3), net)
+	r1.Add("o", NewIDwithA(4), net)
+	assertText("hello\n")
+
+	assert.Equal(t, 5, net.Queue.ElementCount())
+	net.Broadcast()
+	assert.Equal(t, 5, len(r2.Inbox))
+	for i, ibx := range r2.Inbox {
+		assert.Equal(t, "A", ibx.Op.From)
+		assert.Equal(t, i+1, ibx.Op.ID.Counter)
+		assert.Equal(t, "A", ibx.Op.ID.ReplicaID)
+		assert.Equal(t, "insert", ibx.Op.Type)
+	}
+
+	assert.Equal(t, "h", r2.Inbox[0].Op.Value)
+	assert.Equal(t, "e", r2.Inbox[1].Op.Value)
+	assert.Equal(t, "l", r2.Inbox[2].Op.Value)
+	assert.Equal(t, "l", r2.Inbox[3].Op.Value)
+	assert.Equal(t, "o", r2.Inbox[4].Op.Value)
 }

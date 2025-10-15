@@ -3,16 +3,17 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"sort"
 	"strings"
 )
 
 type ID struct {
-	Counter   uint64
+	Counter   int
 	ReplicaID string
 }
 
-func NewIDwithA(c uint64) ID {
+func NewIDwithA(c int) ID {
 	return ID{
 		Counter:   c,
 		ReplicaID: "A",
@@ -72,7 +73,7 @@ func (n *Node) IsHead() bool {
 }
 
 type RGA struct {
-	Counter uint64
+	Counter int
 	Head    *Node
 	Cache   map[ID]*Node
 }
@@ -221,8 +222,16 @@ func (q *Queue) ElementCount() int {
 type Network struct {
 	Replicas []*Replica
 	Queue    *Queue
+	cache    map[string]*Replica
 }
 
+func NewNetwork(numofReplica int, queueSize int) *Network {
+	return &Network{
+		Replicas: make([]*Replica, 0, numofReplica),
+		Queue:    NewQueue(queueSize),
+		cache:    make(map[string]*Replica),
+	}
+}
 func (n *Network) AddToQueue(op Op) {
 	for _, r := range n.Replicas {
 		if r.ReplicaID == op.From {
@@ -238,9 +247,12 @@ func (n *Network) AddToQueue(op Op) {
 
 func (n *Network) AddNewReplica(r *Replica) {
 	n.Replicas = append(n.Replicas, r)
+	n.cache[r.ReplicaID] = r
 }
 
 func (n *Network) ShowQueue(w io.Writer) {
+	initialReadCounter := n.Queue.readCounter
+	initialInsertCounter := n.Queue.insertCounter
 	length := n.Queue.ElementCount()
 	fmt.Fprintln(w, "Queue with length: ", length)
 	for range length {
@@ -252,12 +264,21 @@ func (n *Network) ShowQueue(w io.Writer) {
 			env.Msg.Op.Value)
 	}
 	fmt.Fprintln(w, "-----------")
+	n.Queue.insertCounter = initialInsertCounter
+	n.Queue.readCounter = initialReadCounter
 }
 
 func (n *Network) Broadcast() {
-	// for _, env := range n.Queue {
-	// env.
-	// }
+	ec := n.Queue.ElementCount()
+	for range ec {
+		env, _ := n.Queue.Pop()
+		replica, ok := n.cache[env.To]
+		if !ok {
+			log.Printf("Replica ID: %s not found", env.To)
+			continue
+		}
+		replica.Inbox = append(replica.Inbox, env.Msg)
+	}
 }
 
 func main() {
