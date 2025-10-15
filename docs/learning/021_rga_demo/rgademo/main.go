@@ -214,9 +214,13 @@ func (q *Queue) Pop() (*Envelope, error) {
 	return &env, nil
 }
 
+func (q *Queue) ElementCount() int {
+	return q.insertCounter - q.readCounter
+}
+
 type Network struct {
 	Replicas []*Replica
-	Queue    []Envelope
+	Queue    *Queue
 }
 
 func (n *Network) AddToQueue(op Op) {
@@ -225,7 +229,7 @@ func (n *Network) AddToQueue(op Op) {
 			// don't send to yourself
 			continue
 		}
-		n.Queue = append(n.Queue, Envelope{
+		_ = n.Queue.Push(Envelope{
 			To:  r.ReplicaID,
 			Msg: Message{Op: op},
 		})
@@ -237,8 +241,10 @@ func (n *Network) AddNewReplica(r *Replica) {
 }
 
 func (n *Network) ShowQueue(w io.Writer) {
-	fmt.Fprintln(w, "Queue with length: ", len(n.Queue))
-	for _, env := range n.Queue {
+	length := n.Queue.ElementCount()
+	fmt.Fprintln(w, "Queue with length: ", length)
+	for range length {
+		env, _ := n.Queue.Pop()
 		fmt.Fprintf(w, "%s From: %s To: %s: Message: %s\n",
 			strings.ToUpper(env.Msg.Op.Type),
 			env.Msg.Op.From,

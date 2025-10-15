@@ -11,7 +11,7 @@ import (
 func TestOneReplica(t *testing.T) {
 	net := &Network{
 		Replicas: make([]*Replica, 0, 1),
-		Queue:    make([]Envelope, 0, 1024),
+		Queue:    NewQueue(1024),
 	}
 	r1 := NewReplica("A")
 	net.AddNewReplica(r1)
@@ -39,13 +39,13 @@ func TestOneReplica(t *testing.T) {
 	r1.Remove(NewIDwithA(2), net)
 	assertText("hllo\n")
 
-	assert.Equal(t, 0, len(net.Queue))
+	assert.Equal(t, 0, net.Queue.ElementCount())
 }
 
 func TestSendToNetworkQueue(t *testing.T) {
 	net := &Network{
 		Replicas: make([]*Replica, 0, 1),
-		Queue:    make([]Envelope, 0, 1024),
+		Queue:    NewQueue(1024),
 	}
 	r1 := NewReplica("A")
 	net.AddNewReplica(r1)
@@ -66,7 +66,7 @@ func TestSendToNetworkQueue(t *testing.T) {
 	r1.Add("o", NewIDwithA(4), net)
 	assertText("hello\n")
 
-	assert.Equal(t, 5, len(net.Queue))
+	assert.Equal(t, 5, net.Queue.ElementCount())
 	buff := &bytes.Buffer{}
 	net.ShowQueue(buff)
 	expectedMessage := `Queue with length:  5
