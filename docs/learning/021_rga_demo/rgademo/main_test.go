@@ -105,3 +105,27 @@ func TestPush(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Y", queue.data[0].To)
 }
+
+func TestPop(t *testing.T) {
+	queue := NewQueue(10)
+	env := Envelope{To: "X"}
+	assert.Equal(t, 0, queue.readCounter)
+	assert.Equal(t, 0, queue.insertCounter)
+	assert.Equal(t, 10, len(queue.data))
+	_, err := queue.Pop()
+	assert.Equal(t, "buffer is empty", err.Error())
+
+	for range 5 {
+		err := queue.Push(env)
+		require.NoError(t, err)
+	}
+
+	for i := range 5 {
+		data, err := queue.Pop()
+		require.NoError(t, err)
+		assert.NotNil(t, data)
+		assert.Equal(t, i+1, queue.readCounter)
+	}
+	_, err = queue.Pop()
+	assert.Equal(t, "buffer is empty", err.Error())
+}

@@ -204,6 +204,16 @@ func (q *Queue) Push(env Envelope) error {
 	return nil
 }
 
+func (q *Queue) Pop() (*Envelope, error) {
+	if q.insertCounter-q.readCounter == 0 {
+		return nil, fmt.Errorf("buffer is empty")
+	}
+	idx := q.readCounter % q.size
+	env := q.data[idx]
+	q.readCounter++
+	return &env, nil
+}
+
 type Network struct {
 	Replicas []*Replica
 	Queue    []Envelope
