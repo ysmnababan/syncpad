@@ -136,14 +136,14 @@ func (r *RGA) UpdateNode(op Op) {
 
 type Replica struct {
 	ReplicaID string
-	Inbox     []Message
+	Inbox     *Queue[Message]
 	RgaState  *RGA
 }
 
 func NewReplica(ID string) *Replica {
 	return &Replica{
 		ReplicaID: ID,
-		Inbox:     make([]Message, 0),
+		Inbox:     NewQueue[Message](1024),
 		RgaState:  NewRGA(ID),
 	}
 }
@@ -178,23 +178,55 @@ func (r *Replica) PrintTextOnly(w io.Writer) {
 	r.RgaState.Head.PrintText(w)
 }
 
-type Queue struct {
+func (r *RGA) ProcessIncomingOp(op Op) {
+	switch op.Type {
+	case "insert":
+		newNode := Node{
+			ID:     op.ID,
+			PrevID: op.PrevID,
+			Value:  op.Value,
+		}
+		r.Cache[op.ID] = &newNode
+		if op.PrevID.Counter == 0 { // is head
+			r.Head.InsertChild(&newNode)
+		} else {
+			n := r.Cache[op.PrevID]
+			n.InsertChild(&newNode)
+		}
+	case "delete":
+		currentNode, ok := r.Cache[op.ID]
+		if !ok {
+			fmt.Println("missed cache")
+			return
+		}
+		currentNode.Tombstone = true
+	default:
+		fmt.Println("undefined")
+	}
+}
+
+func (r *Replica) ProcessInbox() {
+	msg, _ := r.Inbox.Pop()
+	r.RgaState.ProcessIncomingOp(msg.Op)
+}
+
+type Queue[T any] struct {
 	size          int
-	data          []Envelope
+	data          []T
 	readCounter   int
 	insertCounter int
 }
 
-func NewQueue(N int) *Queue {
-	return &Queue{
-		data:          make([]Envelope, N),
+func NewQueue[T any](N int) *Queue[T] {
+	return &Queue[T]{
+		data:          make([]T, N),
 		readCounter:   0,
 		insertCounter: 0,
 		size:          N,
 	}
 }
 
-func (q *Queue) Push(env Envelope) error {
+func (q *Queue[T]) Push(env T) error {
 	if q.insertCounter-q.readCounter == q.size {
 		return fmt.Errorf("buffer already full")
 	}
@@ -205,7 +237,7 @@ func (q *Queue) Push(env Envelope) error {
 	return nil
 }
 
-func (q *Queue) Pop() (*Envelope, error) {
+func (q *Queue[T]) Pop() (*T, error) {
 	if q.insertCounter-q.readCounter == 0 {
 		return nil, fmt.Errorf("buffer is empty")
 	}
@@ -215,20 +247,20 @@ func (q *Queue) Pop() (*Envelope, error) {
 	return &env, nil
 }
 
-func (q *Queue) ElementCount() int {
+func (q *Queue[T]) ElementCount() int {
 	return q.insertCounter - q.readCounter
 }
 
 type Network struct {
 	Replicas []*Replica
-	Queue    *Queue
+	Queue    *Queue[Envelope]
 	cache    map[string]*Replica
 }
 
 func NewNetwork(numofReplica int, queueSize int) *Network {
 	return &Network{
 		Replicas: make([]*Replica, 0, numofReplica),
-		Queue:    NewQueue(queueSize),
+		Queue:    NewQueue[Envelope](queueSize),
 		cache:    make(map[string]*Replica),
 	}
 }
@@ -277,7 +309,7 @@ func (n *Network) Broadcast() {
 			log.Printf("Replica ID: %s not found", env.To)
 			continue
 		}
-		replica.Inbox = append(replica.Inbox, env.Msg)
+		_ = replica.Inbox.Push(env.Msg)
 	}
 }
 

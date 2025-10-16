@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,7 +77,7 @@ INSERT From: A To: B: Message: o
 }
 
 func TestPush(t *testing.T) {
-	queue := NewQueue(10)
+	queue := NewQueue[Envelope](10)
 	env := Envelope{To: "X"}
 	assert.Equal(t, 0, queue.readCounter)
 	assert.Equal(t, 0, queue.insertCounter)
@@ -102,7 +103,7 @@ func TestPush(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
-	queue := NewQueue(10)
+	queue := NewQueue[Envelope](10)
 	env := Envelope{To: "X"}
 	assert.Equal(t, 0, queue.readCounter)
 	assert.Equal(t, 0, queue.insertCounter)
@@ -149,17 +150,93 @@ func TestBroadcast(t *testing.T) {
 
 	assert.Equal(t, 5, net.Queue.ElementCount())
 	net.Broadcast()
-	assert.Equal(t, 5, len(r2.Inbox))
-	for i, ibx := range r2.Inbox {
+	assert.Equal(t, 5, r2.Inbox.ElementCount())
+	r2Inbox := []*Message{}
+	for range 5 {
+		msg, err := r2.Inbox.Pop()
+		require.NoError(t, err)
+		r2Inbox = append(r2Inbox, msg)
+	}
+	for i, ibx := range r2Inbox {
 		assert.Equal(t, "A", ibx.Op.From)
 		assert.Equal(t, i+1, ibx.Op.ID.Counter)
 		assert.Equal(t, "A", ibx.Op.ID.ReplicaID)
 		assert.Equal(t, "insert", ibx.Op.Type)
 	}
 
-	assert.Equal(t, "h", r2.Inbox[0].Op.Value)
-	assert.Equal(t, "e", r2.Inbox[1].Op.Value)
-	assert.Equal(t, "l", r2.Inbox[2].Op.Value)
-	assert.Equal(t, "l", r2.Inbox[3].Op.Value)
-	assert.Equal(t, "o", r2.Inbox[4].Op.Value)
+	assert.Equal(t, "h", r2Inbox[0].Op.Value)
+	assert.Equal(t, "e", r2Inbox[1].Op.Value)
+	assert.Equal(t, "l", r2Inbox[2].Op.Value)
+	assert.Equal(t, "l", r2Inbox[3].Op.Value)
+	assert.Equal(t, "o", r2Inbox[4].Op.Value)
+}
+
+func TestProcessIncomingOp(t *testing.T) {
+	net := NewNetwork(1, 1024)
+
+	r1 := NewReplica("A")
+	net.AddNewReplica(r1)
+	r2 := NewReplica("B")
+	net.AddNewReplica(r2)
+
+	assertText := func(expected string) {
+		buff := &bytes.Buffer{}
+		r2.PrintTextOnly(buff)
+		assert.Equal(t, expected, buff.String())
+	}
+	assertText("\n")
+	r1.Add("h", NewIDwithA(0), net)
+	net.Broadcast()
+
+	assert.Equal(t, 1, r2.Inbox.ElementCount())
+	msg, err := r2.Inbox.Pop()
+	require.NoError(t, err)
+	op := msg.Op
+	assert.Equal(t, "h", op.Value)
+	assert.Equal(t, 1, op.ID.Counter)
+	assert.Equal(t, "A", op.ID.ReplicaID)
+	r2.RgaState.ProcessIncomingOp(op)
+	assertText("h\n")
+
+	r1.Add("i", NewIDwithA(1), net)
+	r1.Add("k", NewIDwithA(2), net)
+	r1.Add("s", NewIDwithA(3), net)
+	net.Broadcast()
+	for range 3 {
+		msg, err := r2.Inbox.Pop()
+		require.NoError(t, err)
+		r2.RgaState.ProcessIncomingOp(msg.Op)
+	}
+
+	assertText("hiks\n")
+	r1.Remove(NewIDwithA(2), net)
+	net.Broadcast()
+	msg, err = r2.Inbox.Pop()
+	require.NoError(t, err)
+	fmt.Println(msg.Op.Type)
+	r2.RgaState.ProcessIncomingOp(msg.Op)
+	assertText("hks\n")
+}
+
+func TestProcessInbox(t *testing.T) {
+	net := NewNetwork(1, 1024)
+
+	r1 := NewReplica("A")
+	net.AddNewReplica(r1)
+	r2 := NewReplica("B")
+	net.AddNewReplica(r2)
+	r1.Add("h", NewIDwithA(0), net)
+	r1.Add("e", NewIDwithA(1), net)
+	r1.Add("l", NewIDwithA(2), net)
+	r1.Add("l", NewIDwithA(3), net)
+	r1.Add("o", NewIDwithA(4), net)
+
+	net.Broadcast()
+	r2.ProcessInbox()
+	assertText := func(expected string) {
+		buff := &bytes.Buffer{}
+		r2.PrintTextOnly(buff)
+		assert.Equal(t, expected, buff.String())
+	}
+	assertText("hello\n")
 }
