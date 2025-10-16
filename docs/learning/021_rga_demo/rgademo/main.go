@@ -148,6 +148,17 @@ func NewReplica(ID string) *Replica {
 	}
 }
 
+func (r *Replica) AddString(words string, prevID ID, n *Network) {
+	for i, val := range words {
+		id := ID{
+			Counter:   prevID.Counter + i,
+			ReplicaID: prevID.ReplicaID,
+		}
+
+		r.Add(string(val), id, n)
+	}
+}
+
 func (r *Replica) Add(val string, prev ID, n *Network) {
 	if val == "" {
 		return
@@ -206,8 +217,11 @@ func (r *RGA) ProcessIncomingOp(op Op) {
 }
 
 func (r *Replica) ProcessInbox() {
-	msg, _ := r.Inbox.Pop()
-	r.RgaState.ProcessIncomingOp(msg.Op)
+	len := r.Inbox.ElementCount()
+	for range len {
+		msg, _ := r.Inbox.Pop()
+		r.RgaState.ProcessIncomingOp(msg.Op)
+	}
 }
 
 type Queue[T any] struct {

@@ -249,6 +249,31 @@ func TestProcessInbox(t *testing.T) {
 	assertText("o\n")
 }
 
+func TestAddString(t *testing.T) {
+	// setup
+	net := NewNetwork(1, 1024)
+	r1 := NewReplica("A")
+	net.AddNewReplica(r1)
+	r2 := NewReplica("B")
+	net.AddNewReplica(r2)
+
+	assertText := func(r *Replica, expected string) {
+		buff := &bytes.Buffer{}
+		r.PrintTextOnly(buff)
+		assert.Equal(t, expected, buff.String())
+	}
+
+	// execute
+	r1.AddString("hello", NewIDwithA(0), net)
+
+	//assert
+	assertText(r1, "hello\n")
+
+	net.Broadcast()
+	r2.ProcessInbox()
+	assertText(r2, "hello\n")
+}
+
 func TestFlow(t *testing.T) {
 	// setup
 	net := NewNetwork(1, 1024)
@@ -273,4 +298,5 @@ func TestFlow(t *testing.T) {
 	// assert
 	assertText(r1, "hello\n")
 	assertText(r2, "hello\n")
+
 }
