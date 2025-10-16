@@ -13,6 +13,13 @@ type ID struct {
 	ReplicaID string
 }
 
+func (a ID) Less(b ID) bool {
+	if a.Counter != b.Counter {
+		return a.Counter < b.Counter
+	}
+	return a.ReplicaID < b.ReplicaID
+}
+
 func NewIDwithA(c int) ID {
 	return ID{
 		Counter:   c,
@@ -48,10 +55,7 @@ type Node struct {
 func (p *Node) InsertChild(c *Node) {
 	p.Children = append(p.Children, c)
 	sort.Slice(p.Children, func(i, j int) bool {
-		if p.Children[i].ID.Counter != p.Children[j].ID.Counter {
-			return p.Children[i].ID.Counter < p.Children[j].ID.Counter // sort by counter first
-		}
-		return p.Children[i].ID.ReplicaID < p.Children[j].ID.ReplicaID // then by replicaID
+		return p.Children[i].ID.Less(p.Children[j].ID)
 	})
 }
 
@@ -73,7 +77,7 @@ func (n *Node) IsHead() bool {
 }
 
 type RGA struct {
-	Counter int
+	Counter int // increment for local only operation
 	Head    *Node
 	Cache   map[ID]*Node
 }
@@ -192,17 +196,17 @@ func (r *Replica) PrintTextOnly(w io.Writer) {
 func (r *RGA) ProcessIncomingOp(op Op) {
 	switch op.Type {
 	case "insert":
-		newNode := Node{
+		newNode := &Node{
 			ID:     op.ID,
 			PrevID: op.PrevID,
 			Value:  op.Value,
 		}
-		r.Cache[op.ID] = &newNode
+		r.Cache[op.ID] = newNode
 		if op.PrevID.Counter == 0 { // is head
-			r.Head.InsertChild(&newNode)
+			r.Head.InsertChild(newNode)
 		} else {
 			n := r.Cache[op.PrevID]
-			n.InsertChild(&newNode)
+			n.InsertChild(newNode)
 		}
 	case "delete":
 		currentNode, ok := r.Cache[op.ID]
@@ -327,5 +331,16 @@ func (n *Network) Broadcast() {
 	}
 }
 
+// TODO:
+//
+// Add VV map[string]int and update it when applying ops (for anti entropy).
+//
+// Add Pending map[ID][]Op and buffer missing-parent ops.
+//
+// Deduplicate and unify UpdateNode & ProcessIncomingOp.
+//
+// Add tests that exercise out-of-order delivery (receive second char before first) and ensure buffer solves it.
+//
+// Consider mutexes if you run goroutines.
 func main() {
 }
