@@ -274,7 +274,7 @@ func TestAddString(t *testing.T) {
 	assertText(r2, "hello\n")
 }
 
-func TestFlow(t *testing.T) {
+func TestEditSamePos(t *testing.T) {
 	// setup
 	net := NewNetwork(1, 1024)
 
@@ -282,11 +282,14 @@ func TestFlow(t *testing.T) {
 	net.AddNewReplica(r1)
 	r2 := NewReplica("B")
 	net.AddNewReplica(r2)
-	r1.Add("h", NewIDwithA(0), net)
-	r1.Add("e", NewIDwithA(1), net)
-	r1.Add("l", NewIDwithA(2), net)
-	r1.Add("l", NewIDwithA(3), net)
-	r1.Add("o", NewIDwithA(4), net)
+	newID := func(id string, counter int) ID {
+		return ID{
+			ReplicaID: id,
+			Counter:   counter,
+		}
+	}
+	r1.AddString("hello", newID("A", 0), net)
+
 	net.Broadcast()
 	r2.ProcessInbox()
 	assertText := func(r *Replica, expected string) {
@@ -298,5 +301,19 @@ func TestFlow(t *testing.T) {
 	// assert
 	assertText(r1, "hello\n")
 	assertText(r2, "hello\n")
+
+	r1.AddString(" world", newID("A", 5), net)
+	assertText(r1, "hello world\n")
+
+	r2.Add(" ", newID("A", 5), net)
+	r2.AddString("dunia", newID("B", 1), net)
+	assertText(r2, "hello dunia\n")
+
+	// try to sync
+	net.Broadcast()
+	r1.ProcessInbox()
+	assertText(r1, "hello dunia world\n")
+	r2.ProcessInbox()
+	assertText(r2, "hello dunia world\n")
 
 }
