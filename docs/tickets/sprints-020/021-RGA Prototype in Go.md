@@ -1,10 +1,10 @@
 # Ticket: Prototype RGA (Replicated Growable Array) in Go
 
 **ID:** TKT-021
-**Status:** Todo
+**Status:** Done
 **Priority:** High
 **Planned Score:** 5
-**Actual Score:** <fill in after completion>
+**Actual Score:** 8
 **Created:** 2025-10-14
 
 ---
@@ -22,12 +22,12 @@ By the end, you should intuitively understand:
 
 ## ✅ Acceptance Criteria
 
-* [ ] Implement a minimal **RGA** supporting `Insert(afterID, value)` and `Delete(id)`
-* [ ] Represent elements with `(id, value, tombstone, prevID)` and merge logic between replicas
-* [ ] Simulate **at least 2–3 replicas** performing concurrent operations (insert/delete) and merging
-* [ ] Verify **eventual convergence**: all replicas reach identical visible sequences
-* [ ] Log/visualize tombstones and element order during merges
-* [ ] Write a short summary explaining:
+* [X] Implement a minimal **RGA** supporting `Insert(afterID, value)` and `Delete(id)`
+* [X] Represent elements with `(id, value, tombstone, prevID)` and merge logic between replicas
+* [X] Simulate **at least 2–3 replicas** performing concurrent operations (insert/delete) and merging
+* [X] Verify **eventual convergence**: all replicas reach identical visible sequences
+* [X] Log/visualize tombstones and element order during merges
+* [X] Write a short summary explaining:
 
   * How merges resolve order
   * How tombstones accumulate
