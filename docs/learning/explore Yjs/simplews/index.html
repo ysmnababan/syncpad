@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>WebSocket Test</h2>
+  <input id="msg" type="text" placeholder="Type message..." />
+  <button onclick="send()">Send</button>
+  <pre id="log"></pre>
+
+  <script>
+    const ws = new WebSocket("");
+    const log = document.getElementById("log");
+
+    ws.onopen = () => log.textContent += "Connected\n";
+    ws.onmessage = (e) => log.textContent += "Server: " + e.data + "\n";
+    ws.onclose = () => log.textContent += "Disconnected\n";
+
+    function send() {
+      const msg = document.getElementById("msg").value;
+      ws.send(msg);
+      log.textContent += "You: " + msg + "\n";
+    }
+  </script>
+</body>
+</html>
